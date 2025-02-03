@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Curve Visualizer</title>
+<style>
+  .slider-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+  .slider-label {
+      width: 30px;
+      text-align: right;
+      margin-right: 10px;
+  }
+    #canvas {
+      border: 1px solid black;
+    }
+    .slider-button {
+      margin-left: 5px;
+      cursor: pointer;
+      padding: 2px;
+    }
+    .delete-button {
+      margin-left: 5px;
+      cursor: pointer;
+    }
+</style>
+</head>
+<body>
+  <h1>Curve Visualizer</h1>
+
+  <label for="valuesInput">Values (comma separated):</label>
+  <input type="text" id="valuesInput" value="0, 0.1, 0.2, 0.25, 0.25, 0.2, 0.1, 0">
+
+  <div id="sliderContainer">
+    <!-- Sliders will be added here by JavaScript -->
+  </div>
+
+    <canvas id="canvas" width="400" height="200"></canvas>
+
+  <script>
+    const valuesInput = document.getElementById('valuesInput');
+    const sliderContainer = document.getElementById('sliderContainer');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+
+
+    function updateSliders(values) {
+      // Clear existing sliders
+      sliderContainer.innerHTML = '';
+
+      values.forEach((val, index) => {
+        const sliderContainerDiv = document.createElement('div');
+        sliderContainerDiv.classList.add('slider-container');
+
+        const label = document.createElement('span');
+        label.textContent = index + ":";
+          label.classList.add('slider-label');
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = 0;
+        slider.max = 1;
+        slider.step = 0.01;
+        slider.value = val;
+
+          slider.addEventListener('input', () => {
+              values[index] = parseFloat(slider.value);
+              valuesInput.value = values.join(', ');
+              drawCurve(values);
+          });
+
+          const deleteButton = document.createElement('button');
+          deleteButton.textContent = 'x';
+          deleteButton.classList.add('delete-button');
+        deleteButton.addEventListener('click', () => {
+          values.splice(index, 1);
+          valuesInput.value = values.join(', ');
+          updateValues();
+        });
+
+
+           const addAboveButton = document.createElement('button');
+           addAboveButton.textContent = '+↑';
+           addAboveButton.classList.add('slider-button');
+           addAboveButton.addEventListener('click', () => {
+               values.splice(index, 0, 0.5);
+               valuesInput.value = values.join(', ');
+               updateValues();
+           });
+
+           const addBelowButton = document.createElement('button');
+           addBelowButton.textContent = '+↓';
+           addBelowButton.classList.add('slider-button');
+           addBelowButton.addEventListener('click', () => {
+               values.splice(index + 1, 0, 0.5);
+               valuesInput.value = values.join(', ');
+               updateValues();
+           });
+
+           const moveUpButton = document.createElement('button');
+          moveUpButton.textContent = '↑';
+          moveUpButton.classList.add('slider-button');
+        moveUpButton.addEventListener('click', () => {
+            if(index > 0){
+              const temp = values[index]
+              values[index] = values[index - 1]
+                values[index - 1] = temp;
+                valuesInput.value = values.join(', ');
+                updateValues();
+            }
+        })
+
+        const moveDownButton = document.createElement('button');
+          moveDownButton.textContent = '↓';
+          moveDownButton.classList.add('slider-button');
+        moveDownButton.addEventListener('click', () => {
+            if(index < values.length - 1){
+              const temp = values[index]
+              values[index] = values[index + 1]
+                values[index + 1] = temp;
+                valuesInput.value = values.join(', ');
+                updateValues();
+            }
+        })
+
+        sliderContainerDiv.appendChild(label);
+        sliderContainerDiv.appendChild(slider);
+        sliderContainerDiv.appendChild(addAboveButton)
+        sliderContainerDiv.appendChild(addBelowButton);
+        sliderContainerDiv.appendChild(moveUpButton);
+        sliderContainerDiv.appendChild(moveDownButton);
+        sliderContainerDiv.appendChild(deleteButton)
+        sliderContainer.appendChild(sliderContainerDiv);
+      });
+    }
+
+    function updateValues() {
+        const inputString = valuesInput.value.trim();
+      const values = inputString === '' ? [] : inputString.split(',').map(parseFloat);
+        if (values.some(isNaN)) {
+          console.error("Invalid value in input: non-numeric input.");
+          return;
+        }
+      updateSliders(values);
+        drawCurve(values);
+    }
+
+
+    function drawCurve(values) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (values.length < 2) return;
+
+        ctx.beginPath();
+
+        const step = canvas.width / (values.length - 1);
+
+        function getPoint(index) {
+            const x = step * index;
+            const y = canvas.height - (values[index] * canvas.height);
+            return {x, y};
+        }
+
+        function catmullRom(p0, p1, p2, p3, t) {
+            const v0x = (p2.x - p0.x) * 0.5;
+            const v0y = (p2.y - p0.y) * 0.5;
+            const v1x = (p3.x - p1.x) * 0.5;
+            const v1y = (p3.y - p1.y) * 0.5;
+
+           const tt = t * t;
+            const ttt = t * tt;
+
+            const x = (2 * p1.x - 2 * p2.x + v0x + v1x)*ttt
+                      + (-3 * p1.x + 3 * p2.x - 2 * v0x - v1x)*tt
+                      + v0x*t
+                      + p1.x
+
+             const y = (2 * p1.y - 2 * p2.y + v0y + v1y)*ttt
+                      + (-3 * p1.y + 3 * p2.y - 2 * v0y - v1y)*tt
+                      + v0y*t
+                      + p1.y
+            return {x, y};
+        }
+
+
+        for (let i = 0; i < values.length - 1; i++) {
+            const p1 = getPoint(i);
+            const p2 = getPoint(i + 1);
+
+
+           let p0 = p1;
+           if(i > 0){
+             p0 = getPoint(i - 1);
+           }
+           let p3 = p2;
+           if(i < values.length -2){
+             p3 = getPoint(i + 2)
+           }
+
+
+              if (i === 0) {
+                  ctx.moveTo(p1.x, p1.y);
+              }
+            for (let t = 0; t <= 1; t += 0.02) {
+                const {x, y} = catmullRom(p0, p1, p2, p3, t);
+                ctx.lineTo(x, y);
+            }
+
+        }
+        ctx.stroke();
+    }
+
+
+    // Initial setup
+    valuesInput.addEventListener('input', updateValues);
+    updateValues();
+  </script>
+</body>
+</html>
